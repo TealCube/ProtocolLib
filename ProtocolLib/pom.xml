@@ -17,10 +17,15 @@
   </properties>
 
   <distributionManagement>
+    <snapshotRepository>
+      <id>tealcube-repo</id>
+      <name>TealCube Maven Repository</name>
+      <url>http://tealcube.com/nexus/content/repositories/snapshots</url>
+    </snapshotRepository>
     <repository>
-      <id>shadowvolt-repo</id>
-      <name>Shadowvolt Maven Repository</name>
-      <url>http://ci.shadowvolt.com/plugin/repository/everything/</url>
+      <id>tealcube-repo</id>
+      <name>TealCube Maven Repository</name>
+      <url>http://tealcube.com/nexus/content/repositories/releases</url>
     </repository>
   </distributionManagement>
 
