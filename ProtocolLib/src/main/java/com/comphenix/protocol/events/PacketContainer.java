@@ -32,6 +32,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -86,6 +87,7 @@ import com.comphenix.protocol.wrappers.EnumWrappers.ResourcePackStatus;
 import com.comphenix.protocol.wrappers.EnumWrappers.ScoreboardAction;
 import com.comphenix.protocol.wrappers.EnumWrappers.TitleAction;
 import com.comphenix.protocol.wrappers.EnumWrappers.WorldBorderAction;
+import com.comphenix.protocol.wrappers.MultiBlockChangeInfo;
 import com.comphenix.protocol.wrappers.PlayerInfoData;
 import com.comphenix.protocol.wrappers.WrappedAttribute;
 import com.comphenix.protocol.wrappers.WrappedBlockData;
@@ -458,11 +460,8 @@ public class PacketContainer implements Serializable {
 	
 	/**
 	 * Retrieves a read/write structure for chunk positions.
-	 * 
-	 * @deprecated ChunkPosition no longer exists.
 	 * @return A modifier for a ChunkPosition.
 	 */
-	@Deprecated
 	public StructureModifier<ChunkPosition> getPositionModifier() {
 		// Convert to and from the Bukkit wrapper
 		return structureModifier.withType(
@@ -615,13 +614,28 @@ public class PacketContainer implements Serializable {
 	 * Retrieves a read/write structure for BlockData in Minecraft 1.8.
 	 * <p>
 	 * This modifier will automatically marshall between WrappedBlockData and the
-	 * internal Minecraft BlockData.
+	 * internal Minecraft IBlockData.
 	 * @return A modifier for BlockData fields.
 	 */
 	public StructureModifier<WrappedBlockData> getBlockData() {
-		// Conver to and from our wrapper
+		// Convert to and from our wrapper
 		return structureModifier.<WrappedBlockData>withType(
 				MinecraftReflection.getIBlockDataClass(), BukkitConverters.getWrappedBlockDataConverter());
+	}
+
+	/**
+	 * Retrieves a read/write structure for MultiBlockChangeInfo arrays in Minecraft 1.8.
+	 * <p>
+	 * This modifier will automatically marshall between MultiBlockChangeInfo and the
+	 * internal Minecraft MultiBlockChangeInfo.
+	 * @return A modifier for BlockData fields.
+	 */
+	public StructureModifier<MultiBlockChangeInfo[]> getMultiBlockChangeInfoArrays() {
+		ChunkCoordIntPair chunk = getChunkCoordIntPairs().read(0);
+
+		// Convert to and from our wrapper
+		return structureModifier.<MultiBlockChangeInfo[]>withType(
+				MinecraftReflection.getMultiBlockChangeInfoArrayClass(), MultiBlockChangeInfo.getArrayConverter(chunk));
 	}
 	
 	/**
@@ -986,7 +1000,72 @@ public class PacketContainer implements Serializable {
 	private ByteBuf createPacketBuffer() {
 		return MinecraftReflection.getPacketDataSerializer(UnpooledByteBufAllocator.DEFAULT.buffer());
 	}
-	
+
+	// ---- Metadata
+	// This map will only be initialized if it is actually used
+	private Map<String, Object> metadata;
+
+	/**
+	 * Gets the metadata value for a given key.
+	 * 
+	 * @param key Metadata key
+	 * @return Metadata value, or null if nonexistent.
+	 */
+	public Object getMetadata(String key) {
+		if (metadata != null) {
+			return metadata.get(key);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Adds metadata to this packet.
+	 * <p>
+	 * Note: Since metadata is lazily initialized, this may result in the creation of the metadata map.
+	 * 
+	 * @param key Metadata key
+	 * @param value Metadata value
+	 */
+	public void addMetadata(String key, Object value) {
+		if (metadata == null) {
+			metadata = new HashMap<String, Object>();
+		}
+
+		metadata.put(key, value);
+	}
+
+	/**
+	 * Removes metadata from this packet.
+	 * <p>
+	 * Note: If this operation leaves the metadata map empty, the map will be set to null.
+	 * 
+	 * @param key Metadata key
+	 * @return The previous value, or null if nonexistant.
+	 */
+	public Object removeMetadata(String key) {
+		if (metadata != null) {
+			Object value = metadata.remove(key);
+			if (metadata.isEmpty()) {
+				metadata = null;
+			}
+
+			return value;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Whether or not this packet has metadata for a given key.
+	 * 
+	 * @param key Metadata key
+	 * @return True if this packet has metadata for the key, false if not.
+	 */
+	public boolean hasMetadata(String key) {
+		return metadata != null && metadata.containsKey(key);
+	}
+
 	/**
 	 * Retrieve the cached method concurrently.
 	 * @param lookup - a lazy lookup cache.
